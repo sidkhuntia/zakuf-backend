@@ -47,12 +47,9 @@ func setLicenseKey() error {
 
 func main() {
 
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
+	godotenv.Load()
 
-	err = setLicenseKey()
+	err := setLicenseKey()
 	if err != nil {
 		fmt.Printf("Failed to load license: %v\n", err)
 		os.Exit(1)
