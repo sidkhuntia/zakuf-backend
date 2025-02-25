@@ -6,23 +6,70 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/joho/godotenv"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/pdfcpu/pdfcpu/pkg/api"
+	officel "github.com/unidoc/unioffice/common/license"
+	"github.com/unidoc/unioffice/document"
+	"github.com/unidoc/unioffice/document/convert"
+	pdfl "github.com/unidoc/unipdf/v3/common/license"
 )
 
 type FileOrder struct {
 	Files []string `json:"files"`
 }
 
+func setLicenseKey() error {
+	apiKey := os.Getenv("UNICLOUD_METERED_KEY")
+	if apiKey == "" {
+		return fmt.Errorf("Missing UNICLOUD_METERED_KEY environment variable")
+	}
+
+	err := officel.SetMeteredKey(apiKey)
+	if err != nil {
+		return err
+	}
+
+	err = pdfl.SetMeteredKey(apiKey)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func main() {
+
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	err = setLicenseKey()
+	if err != nil {
+		fmt.Printf("Failed to load license: %v\n", err)
+		os.Exit(1)
+	}
+
 	r := gin.Default()
+
+	username := os.Getenv("USERNAME")
+	password := os.Getenv("PASSWORD")
+
+	auth := r.Group("/", gin.BasicAuth(gin.Accounts{
+		username: password,
+	}))
+
+	auth.GET("/admin", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"message": "Admin page"})
+	})
 
 	// Configure CORS
 	r.Use(cors.New(cors.Config{
@@ -172,36 +219,25 @@ func main() {
 		}()
 	})
 
-	// Serve frontend static files
-	r.Static("/", "./public")
 
 	r.Run(":8080")
 }
 
 // Helper function to convert DOCX to PDF using LibreOffice
 func convertDocxToPdf(docxPath, pdfPath string) error {
-	cmd := exec.Command(
-		"soffice",
-		"--headless",
-		"--convert-to", "pdf",
-		"--outdir", filepath.Dir(pdfPath),
-		docxPath,
-	)
 
-	output, err := cmd.CombinedOutput()
+	doc, err := document.Open(docxPath)
 	if err != nil {
-		log.Printf("LibreOffice conversion error: %s", output)
+		return err
+	}
+	defer doc.Close()
+	c := convert.ConvertToPdf(doc)
+
+	err = c.WriteToFile(pdfPath)
+	if err != nil {
 		return err
 	}
 
-	// LibreOffice outputs to the same filename but with .pdf extension
-	// We need to rename it to match our expected path
-	libreOfficePdfPath := strings.TrimSuffix(docxPath, ".docx") + ".pdf"
-	if libreOfficePdfPath != pdfPath {
-		if err := os.Rename(libreOfficePdfPath, pdfPath); err != nil {
-			return err
-		}
-	}
-
 	return nil
+
 }
