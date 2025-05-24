@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  app:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    depends_on:
+      - gotenberg
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    environment:
+      - GOTENBERG_LOG_LEVEL=debug
+    

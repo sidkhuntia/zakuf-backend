@@ -59,7 +59,7 @@ type URLConversionRequest struct {
 func getGotenbergURL() string {
 	gotenbergURL := os.Getenv("GOTENBERG_URL")
 	if gotenbergURL == "" {
-		gotenbergURL = "http://localhost:3000"
+		gotenbergURL = "http://gotenberg:3000"
 	}
 	return gotenbergURL
 }
@@ -351,7 +351,7 @@ func main() {
 		// Try Gotenberg first
 		result, err := proxyToGotenbergDirect(files, conversionReq.ConversionType, conversionReq.Options)
 		if err != nil {
-			fmt.Printf("Gotenberg failed: %v, falling back to local processing\n", err)
+			fmt.Printf("Gotenberg failed: %v, ignoring error\n", err)
 
 			// Only fallback for LibreOffice conversions
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Gotenberg conversion failed: " + err.Error()})
